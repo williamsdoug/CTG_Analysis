@@ -9,19 +9,25 @@
 ### Signal Preprocessing
 
 # In clinical practice, during the recording process using Doppler ultrasound, the FHR signal
-# contains many artifacts or spikes due to maternal and fetal movements or transducer displacement [1].  Therefore, before further analysis, we eliminated noise to obtain a relatively pure signal for more accurate results, as described in Reference [18].
+# contains many artifacts or spikes due to maternal and fetal movements or transducer displacement [1].
+# Therefore, before further analysis, we eliminated noise to obtain a relatively pure signal for more accurate
+# results, as described in Reference [18].
 
-# In this work, we employed a preprocessing involving three steps.  Assume x(i) is an FHR signal with unit of beats per min (bpm) and a frequency of 4 Hz, where i = 1,2, ..., N and N is the number of samples.
-
-# - A stable segment is chosen as the starting point; in such a segment, five adjacent samples do not differ by more than 10 bpm, and missing data are excluded when the length of x(i) = 0 is equal or more than 10 s.
-
+# In this work, we employed a preprocessing involving three steps.  Assume x(i) is an FHR signal
+# with unit of beats per min (bpm) and a frequency of 4 Hz, where i = 1,2, ..., N and N is the number of samples.
+# - A stable segment is chosen as the starting point; in such a segment, five adjacent samples
+#   do not differ by more than 10 bpm, and missing data are excluded when the length of x(i) = 0 is
+#   equal or more than 10 s.
 # - Values of x(i) ≤50 or x(i) ≥ 200  are considered data spikes and are removed using linear interpolation
-
-# - We extrapolate x(i) using spline interolation again when the difference between x(i) and x(i-1) exceed 25 bpm, a value used to define unstable segments
+# - We extrapolate x(i) using spline interolation again when the difference between x(i) and x(i-1)
+#   exceed 25 bpm, a value used to define unstable segments
 
 # Twenty minutes (N = 4800 samples) of signal length was the target used for further continuous
 # processing in this paper. Taking the signal labeled No. 1001 as a typical example, the result of this artifact removal scheme is presented in Figure 3.
 
+
+# TODO:
+# - Replace interp with spline interpolation for filter_large_changes
 
 from pprint import pprint
 
@@ -168,7 +174,7 @@ def filter_large_changes(sig, valid, tm, max_change=25, w=8, verbose=False):
     return sig, valid
 
 
-def get_valid_segments(orig_hr, ts, recno, verbose=False):
+def get_valid_segments(orig_hr, ts, recno, max_change=25, verbose=False, verbose_details=False):
     """Returns valid segments ordered by error rate"""
 
     if verbose:
@@ -187,8 +193,8 @@ def get_valid_segments(orig_hr, ts, recno, verbose=False):
     ts = ts[i_start:]
     tm = ts / 60
 
-    sig_hr = trim_short_segments(sig_hr)
-    valid_segments = find_valid_segments(sig_hr)
+    sig_hr = trim_short_segments(sig_hr, verbose=verbose_details)
+    valid_segments = find_valid_segments(sig_hr, verbose=verbose_details)
 
     selected_segments = []
     for seg_start, seg_end in valid_segments:
@@ -211,7 +217,7 @@ def get_valid_segments(orig_hr, ts, recno, verbose=False):
             seg_tm = tm[seg_start:seg_end]
 
         seg_hr, mask = replace_missing_values(seg_hr)
-        seg_hr, mask = filter_large_changes(seg_hr, mask, seg_tm)
+        seg_hr, mask = filter_large_changes(seg_hr, mask, seg_tm, max_change=max_change, verbose=verbose_details)
 
         selected_segments.append(
             {'seg_start': seg_start,
@@ -250,16 +256,15 @@ def get_valid_segments(orig_hr, ts, recno, verbose=False):
             plt.ylim(-0.1, 1.1)
             plt.show()
 
-
-            deriv_thresh = 15
-            plt.figure(figsize=(12, 2))
-            plt.title('{}: Final Signal diff  {}-{}'.format(recno, seg_start, seg_end))
-            plt.plot(seg_tm[:-1], np.diff(seg_hr))
-            plt.plot([seg_tm[0], seg_tm[-1]], [0,0], 'r--')
-            plt.plot([seg_tm[0], seg_tm[-1]], [deriv_thresh, deriv_thresh], 'k--')
-            plt.plot([seg_tm[0], seg_tm[-1]], [-deriv_thresh, -deriv_thresh], 'k--')
-            plt.xlim(seg_tm[0], seg_tm[-1])
-            plt.show()
+            if verbose_details:
+                plt.figure(figsize=(12, 2))
+                plt.title('{}: Final Signal diff  {}-{}'.format(recno, seg_start, seg_end))
+                plt.plot(seg_tm[:-1], np.diff(seg_hr))
+                plt.plot([seg_tm[0], seg_tm[-1]], [0,0], 'r--')
+                plt.plot([seg_tm[0], seg_tm[-1]], [max_change, max_change], 'k--')
+                plt.plot([seg_tm[0], seg_tm[-1]], [-max_change, -max_change], 'k--')
+                plt.xlim(seg_tm[0], seg_tm[-1])
+                plt.show()
 
             print('Valid: {:0.1f}%'.format(100 * pct_valid))
 
